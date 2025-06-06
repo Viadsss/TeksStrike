@@ -1,6 +1,5 @@
 import { motion } from "framer-motion";
 import backImage from "../assets/images/cards/card_back.png";
-import { useState } from "react";
 import type { CardData } from "../types";
 
 interface Props {
@@ -10,8 +9,6 @@ interface Props {
 }
 
 export default function Card({ card, onClick, flipped = false }: Props) {
-  const [isHovered, setIsHovered] = useState(false);
-
   return (
     <motion.div
       className={`
@@ -20,15 +17,11 @@ export default function Card({ card, onClick, flipped = false }: Props) {
       ${flipped ? "bg-gray-200" : "bg-white"}
     `}
       whileHover={{
-        y: -20,
+        y: -80,
         scale: 1.05,
-        zIndex: 50,
         transition: { duration: 0.15 },
       }}
-      onHoverStart={() => setIsHovered(true)}
-      onHoverEnd={() => setIsHovered(false)}
       onClick={onClick}
-      style={{ zIndex: isHovered ? 50 : 0 }}
     >
       <img
         src={flipped ? backImage : card.image}

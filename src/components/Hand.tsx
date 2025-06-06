@@ -20,6 +20,7 @@ export default function Hand({
 }: Props) {
   const ref = useRef<HTMLDivElement>(null);
   const [handWidth, setHandWidth] = useState(0);
+  const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
 
   const virtualFanWidth = Math.min(handWidth, hand.length * 100);
   const virtualFanHeight = virtualFanWidth * 0.75;
@@ -71,7 +72,10 @@ export default function Hand({
           className="absolute"
           style={{
             transformOrigin: reverse ? "center top" : "center bottom",
+            zIndex: hoveredIndex === i ? 50 : 0,
           }}
+          onHoverStart={interactive ? () => setHoveredIndex(i) : undefined}
+          onHoverEnd={interactive ? () => setHoveredIndex(null) : undefined}
         >
           <Card
             card={card}
