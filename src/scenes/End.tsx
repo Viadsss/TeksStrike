@@ -1,8 +1,10 @@
+import { useContext } from "react";
 import { cards } from "../cards";
 import { Enemy } from "../Enemy";
 import { Player } from "../Player";
 import type { GameState } from "../types";
 import { motion } from "framer-motion";
+import { SoundContext } from "../context/SoundContext";
 
 interface Props {
   gameState: GameState;
@@ -10,7 +12,11 @@ interface Props {
 }
 
 export default function End({ gameState, setGameState }: Props) {
+  const { playClick } = useContext(SoundContext);
+
   const handlePlayAgain = () => {
+    playClick();
+
     setGameState({
       state: "menu",
       endStatus: "pending",
