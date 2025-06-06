@@ -1,3 +1,4 @@
+import Card from "../components/Card";
 import type { GameState } from "../types";
 
 interface Props {
@@ -6,9 +7,19 @@ interface Props {
 }
 
 export default function Collision({ gameState }: Props) {
+  const { player, enemy } = gameState;
+
+  console.log(gameState);
+
   return (
     <div className="bg-white">
-      <pre>{JSON.stringify(gameState, null, 2)}</pre>
+      {player.selectedCard && (
+        <Card card={player.selectedCard} flipped={false} allowHover={false} />
+      )}
+
+      {enemy.selectedCard && (
+        <Card card={enemy.selectedCard} flipped={false} allowHover={false} />
+      )}
     </div>
   );
 }

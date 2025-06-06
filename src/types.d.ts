@@ -1,13 +1,12 @@
-// types.d.ts
+import { Player } from "./Player";
+import { Enemy } from "./Enemy";
+
 export type SceneState = "loading" | "menu" | "game" | "collision";
 
 export interface GameState {
   state: SceneState;
-  playerCards: CardData[];
-  playerSelectedCardID: number | null;
-
-  enemyCards: CardData[];
-  enemySelectedCardID: number | null;
+  player: Player;
+  enemy: Enemy;
 }
 
 export interface SceneProps {
@@ -21,19 +20,21 @@ export interface CardData {
   name: string; // Name of the card
 }
 
+export interface Position {
+  x: number;
+  y: number;
+}
+
+// These interfaces are now less needed since we have classes,
+// but keeping them for backward compatibility if needed
 export interface EnemySelectedCard {
   card: CardData;
   id: number;
-  initialPosition?: { x: number; y: number };
+  initialPosition?: Position;
 }
 
 export interface SelectedCard {
   card: CardData;
   id: number;
-  initialPosition?: { x: number; y: number };
-}
-
-export interface Position {
-  x: number;
-  y: number;
+  initialPosition?: Position;
 }
