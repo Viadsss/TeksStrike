@@ -36,7 +36,7 @@ export default function Menu({ setGameState }: Props) {
         className="text-xl border rounded px-4 py-2 mt-8 hover:bg-gray-200 transition"
         onClick={() => {
           stop();
-          setGameState({ state: "game" });
+          setGameState((prev) => ({ ...prev, state: "game" }));
         }}
       >
         Start Game

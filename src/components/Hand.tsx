@@ -5,7 +5,7 @@ import type { CardData } from "../types";
 
 interface Props {
   hand: CardData[];
-  onCardClick?: (card: CardData, index: number) => void;
+  onCardClick?: (card: CardData, id: number, element: HTMLElement) => void;
   flippedCards?: boolean;
   reverse?: boolean;
   interactive?: boolean;
@@ -55,6 +55,15 @@ export default function Hand({
     },
   };
 
+  const handleCardClick = (
+    card: CardData,
+    event: React.MouseEvent<HTMLDivElement>
+  ) => {
+    if (onCardClick) {
+      onCardClick(card, card.id, event.currentTarget);
+    }
+  };
+
   return (
     <div
       ref={ref}
@@ -79,7 +88,7 @@ export default function Hand({
         >
           <Card
             card={card}
-            onClick={interactive ? () => onCardClick?.(card, i) : undefined}
+            onClick={interactive ? (e) => handleCardClick(card, e) : undefined}
             flipped={flippedCards}
           />
         </motion.div>

@@ -5,10 +5,16 @@ import type { CardData } from "../types";
 interface Props {
   card: CardData;
   flipped?: boolean;
-  onClick?: () => void;
+  allowHover?: boolean;
+  onClick?: (e: React.MouseEvent<HTMLDivElement>) => void;
 }
 
-export default function Card({ card, onClick, flipped = false }: Props) {
+export default function Card({
+  card,
+  onClick,
+  allowHover = true,
+  flipped = false,
+}: Props) {
   return (
     <motion.div
       className={`
@@ -16,11 +22,15 @@ export default function Card({ card, onClick, flipped = false }: Props) {
       ${onClick ? "cursor-pointer" : "pointer-events-none"}
       ${flipped ? "bg-gray-200" : "bg-white"}
     `}
-      whileHover={{
-        y: -80,
-        scale: 1.05,
-        transition: { duration: 0.15 },
-      }}
+      whileHover={
+        allowHover
+          ? {
+              y: -80,
+              scale: 1.05,
+              transition: { duration: 0.15 },
+            }
+          : {}
+      }
       onClick={onClick}
     >
       <img

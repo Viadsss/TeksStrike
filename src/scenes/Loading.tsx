@@ -13,7 +13,8 @@ export default function Loading({ setGameState }: Props) {
     const timer = setTimeout(() => {
       setIsExiting(true); // trigger fade out
       setTimeout(() => {
-        setGameState({ state: "menu" }); // actually hide after fade
+        setGameState((prev) => ({ ...prev, state: "game" }));
+        // actually hide after fade
       }, 500); // match with exit animation duration
     }, 3000);
 
