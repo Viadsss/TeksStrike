@@ -1,10 +1,19 @@
 import { Player } from "./Player";
 import { Enemy } from "./Enemy";
 
-export type SceneState = "loading" | "menu" | "game" | "collision";
+export type SceneState =
+  | "loading"
+  | "menu"
+  | "rules"
+  | "game"
+  | "collision"
+  | "end";
+
+export type EndStatus = "win" | "lose" | "draw" | "pending";
 
 export interface GameState {
   state: SceneState;
+  endStatus: EndStatus;
   player: Player;
   enemy: Enemy;
 }
@@ -23,18 +32,4 @@ export interface CardData {
 export interface Position {
   x: number;
   y: number;
-}
-
-// These interfaces are now less needed since we have classes,
-// but keeping them for backward compatibility if needed
-export interface EnemySelectedCard {
-  card: CardData;
-  id: number;
-  initialPosition?: Position;
-}
-
-export interface SelectedCard {
-  card: CardData;
-  id: number;
-  initialPosition?: Position;
 }

@@ -1,9 +1,10 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useCallback, useContext } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import Hand from "../components/Hand";
 import Card from "../components/Card";
 import { cards } from "../cards";
 import type { CardData, GameState } from "../types";
+import { SoundContext } from "../context/SoundContext";
 
 interface Props {
   gameState: GameState;
@@ -12,48 +13,72 @@ interface Props {
 
 export default function Game({ gameState, setGameState }: Props) {
   const [visibleCards, setVisibleCards] = useState(0);
+  const [gameInitialized, setGameInitialized] = useState(false);
+  const [enemyHasSelectedCard, setEnemyHasSelectedCard] = useState(false);
   const gameAreaRef = useRef<HTMLDivElement>(null);
+  const { playClick, playCardSlide } = useContext(SoundContext);
 
   const { player, enemy } = gameState;
 
+  // Initial card distribution animation
   useEffect(() => {
-    const timer = setInterval(() => {
-      setVisibleCards((prev) => {
-        if (prev >= cards.length) {
-          clearInterval(timer);
-          return prev;
-        }
-        return prev + 1;
-      });
-    }, 200);
+    // Only run if game is not initialized and players have no cards
+    if (
+      !gameInitialized &&
+      player.cards.length === 0 &&
+      enemy.cards.length === 0
+    ) {
+      const timer = setInterval(() => {
+        setVisibleCards((prev) => {
+          if (prev >= cards.length) {
+            clearInterval(timer);
+            setGameInitialized(true);
+            return prev;
+          }
+          return prev + 1;
+        });
+      }, 200);
 
-    return () => clearInterval(timer);
-  }, []);
+      return () => clearInterval(timer);
+    }
+  }, [gameInitialized, player.cards.length, enemy.cards.length]);
 
-  // Update player and enemy cards based on visible cards
+  // Update player and enemy cards based on visible cards (only during initial setup)
   useEffect(() => {
-    const currentPlayerCards = cards.slice(0, visibleCards);
-    const currentEnemyCards = cards.slice(0, visibleCards);
+    if (!gameInitialized && visibleCards > 0) {
+      const currentPlayerCards = cards.slice(0, visibleCards);
+      const currentEnemyCards = cards.slice(0, visibleCards);
 
-    // Update the game state with new cards
-    setGameState((prevState) => ({
-      ...prevState,
-      player: Object.assign(
-        Object.create(Object.getPrototypeOf(prevState.player)),
-        {
-          ...prevState.player,
-          cards: currentPlayerCards,
-        }
-      ),
-      enemy: Object.assign(
-        Object.create(Object.getPrototypeOf(prevState.enemy)),
-        {
-          ...prevState.enemy,
-          cards: currentEnemyCards,
-        }
-      ),
-    }));
-  }, [visibleCards, setGameState]);
+      setGameState((prevState) => ({
+        ...prevState,
+        player: Object.assign(
+          Object.create(Object.getPrototypeOf(prevState.player)),
+          {
+            ...prevState.player,
+            cards: currentPlayerCards,
+          }
+        ),
+        enemy: Object.assign(
+          Object.create(Object.getPrototypeOf(prevState.enemy)),
+          {
+            ...prevState.enemy,
+            cards: currentEnemyCards,
+          }
+        ),
+      }));
+    }
+  }, [visibleCards, setGameState, gameInitialized]);
+
+  // Reset initialization when coming back from other states
+  useEffect(() => {
+    if (
+      gameState.state === "game" &&
+      (player.cards.length > 0 || enemy.cards.length > 0)
+    ) {
+      setGameInitialized(true);
+      setVisibleCards(cards.length);
+    }
+  }, [gameState.state, player.cards.length, enemy.cards.length]);
 
   const handleCardClick = (
     card: CardData,
@@ -63,10 +88,10 @@ export default function Game({ gameState, setGameState }: Props) {
     // If clicking the same card that's already selected, deselect it
     console.log(id);
     if (player.isCardSelected(card.id)) {
-      setGameState((prevState) => {
-        prevState.player.deselectCard();
-        return { ...prevState };
-      });
+      setGameState((prevState) => ({
+        ...prevState,
+        player: prevState.player.deselectCard(),
+      }));
       return;
     }
 
@@ -90,29 +115,29 @@ export default function Game({ gameState, setGameState }: Props) {
           y: cardRect.top - playerAreaRect.top,
         };
 
-        setGameState((prevState) => {
-          prevState.player.selectCard(card, initialPosition);
-          return { ...prevState };
-        });
+        setGameState((prevState) => ({
+          ...prevState,
+          player: prevState.player.selectCard(card, initialPosition),
+        }));
       } else {
         // Fallback: if position calculation fails, still select the card
-        setGameState((prevState) => {
-          prevState.player.selectCard(card);
-          return { ...prevState };
-        });
+        setGameState((prevState) => ({
+          ...prevState,
+          player: prevState.player.selectCard(card),
+        }));
       }
     });
   };
 
   const handleSelectedCardClick = () => {
     // Return the selected card to hand
-    setGameState((prevState) => {
-      prevState.player.deselectCard();
-      return { ...prevState };
-    });
+    setGameState((prevState) => ({
+      ...prevState,
+      player: prevState.player.deselectCard(),
+    }));
   };
 
-  const handleEnemyCardSelection = () => {
+  const handleEnemyCardSelection = useCallback(() => {
     if (enemy.cards.length === 0) return;
 
     // Don't allow selection if already animating
@@ -123,34 +148,68 @@ export default function Game({ gameState, setGameState }: Props) {
     const enemyAreaRect = enemyAreaElement?.getBoundingClientRect();
     const gameRect = gameAreaRef.current?.getBoundingClientRect();
 
-    setGameState((prevState) => {
-      prevState.enemy.selectRandomCard(
+    setGameState((prevState) => ({
+      ...prevState,
+      enemy: prevState.enemy.selectRandomCard(
         gameRect || undefined,
         enemyAreaRect || undefined
-      );
-      return { ...prevState };
-    });
-  };
+      ),
+    }));
+  }, [enemy.cards.length, enemy.isAnimating, player.isAnimating, setGameState]);
 
   const handleResetBattle = () => {
-    setGameState((prevState) => {
-      prevState.player.reset();
-      prevState.enemy.reset();
-      return { ...prevState };
-    });
+    playClick();
+    setEnemyHasSelectedCard(false);
+
+    setGameState((prevState) => ({
+      ...prevState,
+      player: prevState.player.reset(),
+      enemy: prevState.enemy.reset(),
+    }));
   };
 
   const handleAnimationComplete = () => {
-    setGameState((prevState) => {
-      prevState.player.setAnimating(false);
-      prevState.enemy.setAnimating(false);
-      return { ...prevState };
-    });
+    setGameState((prevState) => ({
+      ...prevState,
+      player: prevState.player.setAnimating(false),
+      enemy: prevState.enemy.setAnimating(false),
+    }));
   };
 
   const selectedCard = player.getSelectedCardData();
   const enemySelectedCard = enemy.getSelectedCardData();
   const isAnimating = player.isAnimating || enemy.isAnimating;
+
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout>;
+    if (
+      gameInitialized &&
+      !enemyHasSelectedCard &&
+      enemy.cards.length > 0 &&
+      !player.isAnimating &&
+      !enemy.isAnimating &&
+      !enemy.getSelectedCardData()
+    ) {
+      const delay = Math.random() * 1000 + 2000;
+
+      timer = setTimeout(() => {
+        handleEnemyCardSelection();
+        playCardSlide();
+        setEnemyHasSelectedCard(true);
+      }, delay);
+    }
+
+    return () => {
+      if (timer) clearTimeout(timer);
+    };
+  }, [
+    enemy,
+    enemyHasSelectedCard,
+    gameInitialized,
+    player.isAnimating,
+    handleEnemyCardSelection,
+    playCardSlide,
+  ]);
 
   return (
     <div className="w-7xl h-screen border-2 mx-auto font-gamja border-red-500">
@@ -209,6 +268,7 @@ export default function Game({ gameState, setGameState }: Props) {
                       onClick={handleSelectedCardClick}
                       flipped={false}
                       allowHover={false}
+                      allowModal={true}
                     />
                   </motion.div>
                 )}
@@ -263,8 +323,9 @@ export default function Game({ gameState, setGameState }: Props) {
                   >
                     <Card
                       card={enemySelectedCard.card}
-                      flipped={false}
+                      flipped={true}
                       allowHover={false}
+                      allowModal={false}
                     />
                   </motion.div>
                 )}
@@ -283,25 +344,19 @@ export default function Game({ gameState, setGameState }: Props) {
         {/* Control buttons */}
         <div className="flex gap-4 mb-4">
           <button
-            onClick={handleEnemyCardSelection}
-            disabled={isAnimating || enemy.cards.length === 0}
-            className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 disabled:bg-gray-400 disabled:cursor-not-allowed font-bold"
-          >
-            Enemy Select Card
-          </button>
-          <button
             onClick={handleResetBattle}
             disabled={isAnimating}
-            className="px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 disabled:bg-gray-400 disabled:cursor-not-allowed font-bold"
+            className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 disabled:bg-gray-400 disabled:cursor-not-allowed font-bold"
           >
             Reset Battle
           </button>
           <button
             disabled={!selectedCard || !enemySelectedCard}
             className="px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 disabled:bg-gray-400 disabled:cursor-not-allowed font-bold"
-            onClick={() =>
-              setGameState((prev) => ({ ...prev, state: "collision" }))
-            }
+            onClick={() => {
+              playClick();
+              setGameState((prev) => ({ ...prev, state: "collision" }));
+            }}
           >
             Battle
           </button>
@@ -311,9 +366,7 @@ export default function Game({ gameState, setGameState }: Props) {
           hand={player.getHandCards()}
           flippedCards={false}
           reverse={false}
-          interactive={
-            visibleCards >= cards.length && !isAnimating && !selectedCard
-          }
+          interactive={gameInitialized && !isAnimating && !selectedCard}
           onCardClick={handleCardClick}
         />
       </div>

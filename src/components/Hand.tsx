@@ -35,7 +35,7 @@ export default function Hand({
   }, []);
 
   function angle(i: number) {
-    const factor = hand.length / 4;
+    const factor = hand.length / 5; // controls how much spread (orig is 4)
     let x = offsetFromCenter(hand, i) * 0.05;
     if (hand.length % 2 === 0) x += 0.025;
     return x * (Math.PI / factor);
@@ -89,6 +89,8 @@ export default function Hand({
           <Card
             card={card}
             onClick={interactive ? (e) => handleCardClick(card, e) : undefined}
+            allowHover={interactive}
+            allowModal={interactive}
             flipped={flippedCards}
           />
         </motion.div>
