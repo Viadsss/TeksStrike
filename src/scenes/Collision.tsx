@@ -29,9 +29,16 @@ export default function Collision({ gameState, setGameState }: Props) {
   const { playClick, playCardCharge, playCardCollide } =
     useContext(SoundContext);
 
+  function getModifiedProbability(baseProb: number, modifier: number): number {
+    return Math.max(0, Math.min(1, baseProb + modifier));
+  }
+
   // Auto-start battle when both cards are selected
   useEffect(() => {
-    const startBattle = async () => {
+    const startBattle = async (
+      playerModifiedProbability: number,
+      enemyModifiedProbability: number
+    ) => {
       playCardCharge();
       setBattlePhase("charging");
 
@@ -44,9 +51,18 @@ export default function Collision({ gameState, setGameState }: Props) {
       setBattlePhase("battling");
       await new Promise((resolve) => setTimeout(resolve, 2500));
 
+      const randomChancePlayer = Math.random();
+      const randomChanceEnemy = Math.random();
+
       // Determine face-up status with random chance
-      const playerFaceUpResult = Math.random() > 0.5;
-      const enemyFaceUpResult = Math.random() > 0.5;
+      const playerFaceUpResult = playerModifiedProbability > randomChancePlayer;
+      const enemyFaceUpResult = enemyModifiedProbability > randomChanceEnemy;
+
+      console.log("PLAYER MODIFIED PROB", playerModifiedProbability);
+      console.log("RANDOM CHANCE PLAYER", randomChancePlayer);
+
+      console.log("ENEMY MODIFIED PROB", enemyModifiedProbability);
+      console.log("RANDOM CHANCE ENEMY", randomChanceEnemy);
 
       setPlayerFaceUp(playerFaceUpResult);
       setEnemyFaceUp(enemyFaceUpResult);
@@ -78,7 +94,33 @@ export default function Collision({ gameState, setGameState }: Props) {
     };
 
     if (player.selectedCard && enemy.selectedCard && battlePhase === "setup") {
-      startBattle();
+      let playerModifier = 0;
+      let enemyModifier = 0;
+
+      // Player's card effects
+      if (player.selectedCard?.target === "self") {
+        playerModifier += player.selectedCard.modifier;
+      } else if (player.selectedCard?.target === "enemy") {
+        enemyModifier -= player.selectedCard.modifier;
+      }
+
+      // Enemy's card effects
+      if (enemy.selectedCard?.target === "self") {
+        enemyModifier += enemy.selectedCard.modifier;
+      } else if (enemy.selectedCard?.target === "enemy") {
+        playerModifier -= enemy.selectedCard.modifier;
+      }
+
+      const playerFinalProb = getModifiedProbability(0.5, playerModifier);
+      const enemyFinalProb = getModifiedProbability(0.5, enemyModifier);
+
+      startBattle(playerFinalProb, enemyFinalProb);
+
+      setGameState((prevState) => ({
+        ...prevState,
+        playerModifiedProbability: playerFinalProb,
+        enemyModifiedProbability: enemyFinalProb,
+      }));
     }
   }, [
     player.selectedCard,
@@ -86,6 +128,7 @@ export default function Collision({ gameState, setGameState }: Props) {
     battlePhase,
     playCardCharge,
     playCardCollide,
+    setGameState,
   ]);
 
   // If no cards selected, show waiting message

@@ -1,14 +1,17 @@
-import type { CardData, Position } from "./types";
+import type { Position } from "./types";
+import { Card } from "./Card";
 
 export class Enemy {
-  public cards: CardData[] = [];
-  public selectedCard: CardData | null = null;
+  public cards: Card[] = [];
+  public selectedCard: Card | null = null;
   public selectedCardId: number | null = null;
   public selectedCardInitialPosition: Position | null = null;
   public isAnimating: boolean = false;
   public score: number = 0;
 
-  constructor(cards: CardData[] = []) {
+  public modifiedProbability: number = 0;
+
+  constructor(cards: Card[] = []) {
     this.cards = [...cards]; // Create a copy to avoid mutations
   }
 
@@ -32,7 +35,7 @@ export class Enemy {
   }
 
   // Add a card to the enemy's hand
-  addCard(card: CardData): Enemy {
+  addCard(card: Card): Enemy {
     return this.clone({ cards: [...this.cards, card] });
   }
 
@@ -44,7 +47,7 @@ export class Enemy {
   }
 
   // Select a card for battle
-  selectCard(card: CardData, initialPosition?: Position): Enemy {
+  selectCard(card: Card, initialPosition?: Position): Enemy {
     return this.clone({
       selectedCard: card,
       selectedCardId: card.id,
@@ -103,7 +106,7 @@ export class Enemy {
   // The following methods don't need to return new instances as they don't mutate
 
   // Get cards that are still in hand (not selected)
-  getHandCards(): CardData[] {
+  getHandCards(): Card[] {
     if (this.selectedCardId === null) {
       return this.cards;
     }
@@ -117,7 +120,7 @@ export class Enemy {
 
   // Get the selected card with its metadata
   getSelectedCardData(): {
-    card: CardData;
+    card: Card;
     id: number;
     initialPosition?: Position;
   } | null {
@@ -131,7 +134,7 @@ export class Enemy {
   }
 
   // Get a random card from hand
-  getRandomCard(): CardData | null {
+  getRandomCard(): Card | null {
     const availableCards = this.getHandCards();
     if (availableCards.length === 0) return null;
 
@@ -141,7 +144,5 @@ export class Enemy {
 
   getCardByMiniMax() {}
 
-  miniMaxAlgorithm() {
-    
-  }
+  miniMaxAlgorithm() {}
 }

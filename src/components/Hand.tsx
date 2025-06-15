@@ -1,11 +1,11 @@
 import { motion } from "framer-motion";
 import { useEffect, useRef, useState } from "react";
 import Card from "./Card";
-import type { CardData } from "../types";
+import { Card as CardModel } from "../Card";
 
 interface Props {
-  hand: CardData[];
-  onCardClick?: (card: CardData, id: number, element: HTMLElement) => void;
+  hand: CardModel[];
+  onCardClick?: (card: CardModel, id: number, element: HTMLElement) => void;
   flippedCards?: boolean;
   reverse?: boolean;
   interactive?: boolean;
@@ -56,7 +56,7 @@ export default function Hand({
   };
 
   const handleCardClick = (
-    card: CardData,
+    card: CardModel,
     event: React.MouseEvent<HTMLDivElement>
   ) => {
     if (onCardClick) {
@@ -99,6 +99,6 @@ export default function Hand({
   );
 }
 
-function offsetFromCenter(array: CardData[], index: number): number {
+function offsetFromCenter(array: CardModel[], index: number): number {
   return index - Math.floor(array.length / 2);
 }

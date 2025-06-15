@@ -3,7 +3,8 @@ import { motion, AnimatePresence } from "framer-motion";
 import Hand from "../components/Hand";
 import Card from "../components/Card";
 import { cards } from "../cards";
-import type { CardData, GameState } from "../types";
+import type { GameState } from "../types";
+import { Card as CardModel } from "../Card";
 import { SoundContext } from "../context/SoundContext";
 
 interface Props {
@@ -81,7 +82,7 @@ export default function Game({ gameState, setGameState }: Props) {
   }, [gameState.state, player.cards.length, enemy.cards.length]);
 
   const handleCardClick = (
-    card: CardData,
+    card: CardModel,
     id: number,
     element: HTMLElement
   ) => {
@@ -211,6 +212,12 @@ export default function Game({ gameState, setGameState }: Props) {
     playCardSlide,
   ]);
 
+  function winnerStatus(): "player" | "enemy" | "draw" {
+    if (player.score > enemy.score) return "player";
+    if (enemy.score > player.score) return "enemy";
+    return "draw";
+  }
+
   return (
     <div className="w-7xl h-screen border-2 mx-auto font-gamja border-red-500">
       <div
@@ -338,6 +345,23 @@ export default function Game({ gameState, setGameState }: Props) {
                 </div>
               )}
             </div>
+          </div>
+        </div>
+
+        <div className="flex gap-x-4 justify-around text-2xl -mt-20 text-shadow-red-300 w-full text-white">
+          <div
+            className={`bg-sky-950 rounded py-1 px-2 ${
+              winnerStatus() === "player" ? "border-b-4 border-yellow-400" : ""
+            }`}
+          >
+            Player Score :<span className="font-bold"> {player.score}</span>
+          </div>
+          <div
+            className={`bg-sky-950 rounded py-1 px-2 ${
+              winnerStatus() === "enemy" ? "border-b-4 border-yellow-400" : ""
+            }`}
+          >
+            Enemy Score : <span className="font-bold"> {enemy.score}</span>
           </div>
         </div>
 

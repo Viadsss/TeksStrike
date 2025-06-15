@@ -1,18 +1,18 @@
-import type { CardData, Position } from "./types";
+import { Card } from "./Card";
+import type { Position } from "./types";
 
 export class Player {
-  public cards: CardData[] = [];
-  public selectedCard: CardData | null = null;
+  public cards: Card[] = [];
+  public selectedCard: Card | null = null;
   public selectedCardId: number | null = null;
   public selectedCardInitialPosition: Position | null = null;
   public isAnimating: boolean = false;
   public score: number = 0;
 
-  constructor(cards: CardData[] = []) {
+  constructor(cards: Card[] = []) {
     this.cards = [...cards];
   }
 
-  // Create a new instance with updated properties
   private clone(updates: Partial<Player> = {}): Player {
     const newPlayer = new Player();
     newPlayer.cards = [...this.cards];
@@ -22,7 +22,6 @@ export class Player {
     newPlayer.isAnimating = this.isAnimating;
     newPlayer.score = this.score;
 
-    // Apply updates
     Object.assign(newPlayer, updates);
     return newPlayer;
   }
@@ -31,20 +30,17 @@ export class Player {
     return this.clone({ score: this.score + 1 });
   }
 
-  // Add a card to the player's hand
-  addCard(card: CardData): Player {
+  addCard(card: Card): Player {
     return this.clone({ cards: [...this.cards, card] });
   }
 
-  // Remove a card from the player's hand by ID
   removeCard(cardId: number): Player {
     return this.clone({
       cards: this.cards.filter((card) => card.id !== cardId),
     });
   }
 
-  // Select a card for battle
-  selectCard(card: CardData, initialPosition?: Position): Player {
+  selectCard(card: Card, initialPosition?: Position): Player {
     return this.clone({
       selectedCard: card,
       selectedCardId: card.id,
@@ -53,7 +49,6 @@ export class Player {
     });
   }
 
-  // Deselect the current card
   deselectCard(): Player {
     return this.clone({
       selectedCard: null,
@@ -63,12 +58,10 @@ export class Player {
     });
   }
 
-  // Set animation state
   setAnimating(isAnimating: boolean): Player {
     return this.clone({ isAnimating });
   }
 
-  // Reset player state
   reset(): Player {
     return this.clone({
       selectedCard: null,
@@ -78,24 +71,19 @@ export class Player {
     });
   }
 
-  // The following methods don't need to return new instances as they don't mutate
-
-  // Get cards that are still in hand (not selected)
-  getHandCards(): CardData[] {
+  getHandCards(): Card[] {
     if (this.selectedCardId === null) {
       return this.cards;
     }
     return this.cards.filter((card) => card.id !== this.selectedCardId);
   }
 
-  // Check if a specific card is selected
   isCardSelected(cardId: number): boolean {
     return this.selectedCardId === cardId;
   }
 
-  // Get the selected card with its metadata
   getSelectedCardData(): {
-    card: CardData;
+    card: Card;
     id: number;
     initialPosition?: Position;
   } | null {
