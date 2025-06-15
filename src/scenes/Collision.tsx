@@ -216,6 +216,7 @@ export default function Collision({ gameState, setGameState }: Props) {
         subtitle: "Both cards landed face-up",
         subtext: "Battle again with same cards!",
         buttonText: "Battle Again",
+        titleColor: "text-orange-400", // Orange for draw
       };
     } else if (battleResult === "draw_both_down") {
       return {
@@ -223,19 +224,26 @@ export default function Collision({ gameState, setGameState }: Props) {
         subtitle: "Both cards landed face-down",
         subtext: "Battle again with same cards!",
         buttonText: "Battle Again",
+        titleColor: "text-orange-400", // Orange for draw
       };
     } else if (winner) {
-      const winnerType = winner === "player" ? "Player" : "Enemy";
-      const faceUpText =
-        winner === "player"
-          ? "Player's card landed face-up!"
-          : "Enemy's card landed face-up!";
-      return {
-        title: "VICTORY!",
-        subtitle: `${winnerType} wins!`,
-        subtext: faceUpText,
-        buttonText: "Continue",
-      };
+      if (winner === "player") {
+        return {
+          title: "VICTORY!",
+          subtitle: "Player wins!",
+          subtext: "Player's card landed face-up!",
+          buttonText: "Continue",
+          titleColor: "text-yellow-400", // Gold for victory
+        };
+      } else {
+        return {
+          title: "DEFEAT!",
+          subtitle: "Enemy wins!",
+          subtext: "Enemy's card landed face-up!",
+          buttonText: "Continue",
+          titleColor: "text-red-500", // Red for defeat
+        };
+      }
     }
     return null;
   };
@@ -391,9 +399,7 @@ export default function Collision({ gameState, setGameState }: Props) {
           >
             <h2
               className={`text-4xl font-bold mb-2 drop-shadow-lg ${
-                battleResult?.startsWith("draw")
-                  ? "text-orange-400"
-                  : "text-yellow-400"
+                announcement.titleColor || "text-yellow-400"
               }`}
             >
               {announcement.title}
