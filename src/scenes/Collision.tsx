@@ -16,7 +16,10 @@ type BattleResult =
   | "player_wins"
   | "enemy_wins"
   | "draw_both_up"
-  | "draw_both_down";
+  | "draw_both_down"
+  | "draw_by_repetition";
+
+const MAX_CONSECUTIVE_DRAWS = 5;
 
 export default function Collision({ gameState, setGameState }: Props) {
   const { player, enemy } = gameState;
@@ -26,6 +29,7 @@ export default function Collision({ gameState, setGameState }: Props) {
   const [showEffects, setShowEffects] = useState(false);
   const [playerFaceUp, setPlayerFaceUp] = useState<boolean | null>(null);
   const [enemyFaceUp, setEnemyFaceUp] = useState<boolean | null>(null);
+  const [consecutiveDraws, setConsecutiveDraws] = useState(0);
   const { playClick, playCardCharge, playCardCollide } =
     useContext(SoundContext);
 
@@ -74,17 +78,35 @@ export default function Collision({ gameState, setGameState }: Props) {
       if (playerFaceUpResult && !enemyFaceUpResult) {
         result = "player_wins";
         battleWinner = "player";
+        setConsecutiveDraws(0); // Reset draw counter on win
       } else if (!playerFaceUpResult && enemyFaceUpResult) {
         result = "enemy_wins";
         battleWinner = "enemy";
+        setConsecutiveDraws(0); // Reset draw counter on win
       } else if (playerFaceUpResult && enemyFaceUpResult) {
         // Both face-up = draw
-        result = "draw_both_up";
-        battleWinner = null;
+        const newDrawCount = consecutiveDraws + 1;
+        if (newDrawCount >= MAX_CONSECUTIVE_DRAWS) {
+          result = "draw_by_repetition";
+          battleWinner = null;
+          setConsecutiveDraws(0); // Reset for next battle
+        } else {
+          result = "draw_both_up";
+          battleWinner = null;
+          setConsecutiveDraws(newDrawCount);
+        }
       } else {
         // Both face-down = draw
-        result = "draw_both_down";
-        battleWinner = null;
+        const newDrawCount = consecutiveDraws + 1;
+        if (newDrawCount >= MAX_CONSECUTIVE_DRAWS) {
+          result = "draw_by_repetition";
+          battleWinner = null;
+          setConsecutiveDraws(0); // Reset for next battle
+        } else {
+          result = "draw_both_down";
+          battleWinner = null;
+          setConsecutiveDraws(newDrawCount);
+        }
       }
 
       setBattleResult(result);
@@ -126,6 +148,7 @@ export default function Collision({ gameState, setGameState }: Props) {
     player.selectedCard,
     enemy.selectedCard,
     battlePhase,
+    consecutiveDraws,
     playCardCharge,
     playCardCollide,
     setGameState,
@@ -163,11 +186,11 @@ export default function Collision({ gameState, setGameState }: Props) {
   const handleContinueClick = () => {
     playClick();
 
-    // Check if it's a draw - if so, restart the battle with same cards
-    const isDraw =
+    // Check if it's a regular draw (not by repetition) - if so, restart the battle with same cards
+    const isRegularDraw =
       battleResult === "draw_both_up" || battleResult === "draw_both_down";
 
-    if (isDraw) {
+    if (isRegularDraw) {
       // Reset battle state to replay the collision
       setBattlePhase("setup");
       setWinner(null);
@@ -178,7 +201,7 @@ export default function Collision({ gameState, setGameState }: Props) {
       return; // Don't update game state, just restart the battle
     }
 
-    // Handle non-draw results - proceed normally
+    // Handle non-draw results or draw by repetition - proceed normally
     setGameState((prevState) => {
       // Create new instances
       let newPlayer = new Player(prevState.player.cards);
@@ -188,7 +211,7 @@ export default function Collision({ gameState, setGameState }: Props) {
       newPlayer.score = prevState.player.score;
       newEnemy.score = prevState.enemy.score;
 
-      // Handle win/loss
+      // Handle win/loss (draw by repetition doesn't add to score)
       if (winner === "player") {
         newPlayer = newPlayer.winRound();
       } else if (winner === "enemy") {
@@ -240,7 +263,8 @@ export default function Collision({ gameState, setGameState }: Props) {
       // Handle draw cases - no winner/loser styling
       if (
         battleResult === "draw_both_up" ||
-        battleResult === "draw_both_down"
+        battleResult === "draw_both_down" ||
+        battleResult === "draw_by_repetition"
       ) {
         return "draw";
       }
@@ -257,7 +281,7 @@ export default function Collision({ gameState, setGameState }: Props) {
       return {
         title: "DRAW!",
         subtitle: "Both cards landed face-up",
-        subtext: "Battle again with same cards!",
+        subtext: `Battle again with same cards! (${consecutiveDraws}/${MAX_CONSECUTIVE_DRAWS} draws)`,
         buttonText: "Battle Again",
         titleColor: "text-orange-400", // Orange for draw
       };
@@ -265,9 +289,17 @@ export default function Collision({ gameState, setGameState }: Props) {
       return {
         title: "DRAW!",
         subtitle: "Both cards landed face-down",
-        subtext: "Battle again with same cards!",
+        subtext: `Battle again with same cards! (${consecutiveDraws}/${MAX_CONSECUTIVE_DRAWS} draws)`,
         buttonText: "Battle Again",
         titleColor: "text-orange-400", // Orange for draw
+      };
+    } else if (battleResult === "draw_by_repetition") {
+      return {
+        title: "DRAW!",
+        subtitle: "Too many consecutive draws",
+        subtext: "Battle ends in a stalemate",
+        buttonText: "Continue",
+        titleColor: "text-purple-400", // Purple for draw by repetition
       };
     } else if (winner) {
       if (winner === "player") {
@@ -408,7 +440,8 @@ export default function Collision({ gameState, setGameState }: Props) {
           faceUpInDraw={
             battlePhase === "resolved" &&
             (battleResult === "draw_both_up" ||
-              battleResult === "draw_both_down")
+              battleResult === "draw_both_down" ||
+              battleResult === "draw_by_repetition")
               ? enemyFaceUp
               : undefined
           }
@@ -423,7 +456,8 @@ export default function Collision({ gameState, setGameState }: Props) {
           faceUpInDraw={
             battlePhase === "resolved" &&
             (battleResult === "draw_both_up" ||
-              battleResult === "draw_both_down")
+              battleResult === "draw_both_down" ||
+              battleResult === "draw_by_repetition")
               ? playerFaceUp
               : undefined
           }
@@ -461,8 +495,10 @@ export default function Collision({ gameState, setGameState }: Props) {
         {announcement && (
           <motion.button
             className={`absolute bottom-8 left-1/2 -translate-x-1/2 text-center px-4 py-2 text-white rounded-md font-bold transition cursor-pointer ${
-              battleResult?.startsWith("draw")
+              battleResult === "draw_both_up" || battleResult === "draw_both_down"
                 ? "bg-orange-600 hover:bg-orange-700"
+                : battleResult === "draw_by_repetition"
+                ? "bg-purple-600 hover:bg-purple-700"
                 : "bg-gray-600 hover:bg-gray-700"
             }`}
             initial={{ opacity: 0, y: -50, scale: 0.8 }}
@@ -482,6 +518,11 @@ export default function Collision({ gameState, setGameState }: Props) {
         {battleResult && (
           <div className="text-xs mt-1">
             Result: {battleResult.toUpperCase().replace("_", " ")}
+          </div>
+        )}
+        {consecutiveDraws > 0 && (
+          <div className="text-xs mt-1 text-orange-300">
+            Consecutive Draws: {consecutiveDraws}/{MAX_CONSECUTIVE_DRAWS}
           </div>
         )}
         {battlePhase === "resolved" &&
