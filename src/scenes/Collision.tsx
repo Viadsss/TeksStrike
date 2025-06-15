@@ -120,6 +120,22 @@ export default function Collision({ gameState, setGameState }: Props) {
   const handleContinueClick = () => {
     playClick();
 
+    // Check if it's a draw - if so, restart the battle with same cards
+    const isDraw =
+      battleResult === "draw_both_up" || battleResult === "draw_both_down";
+
+    if (isDraw) {
+      // Reset battle state to replay the collision
+      setBattlePhase("setup");
+      setWinner(null);
+      setBattleResult(null);
+      setShowEffects(false);
+      setPlayerFaceUp(null);
+      setEnemyFaceUp(null);
+      return; // Don't update game state, just restart the battle
+    }
+
+    // Handle non-draw results - proceed normally
     setGameState((prevState) => {
       // Create new instances
       let newPlayer = new Player(prevState.player.cards);
@@ -129,14 +145,14 @@ export default function Collision({ gameState, setGameState }: Props) {
       newPlayer.score = prevState.player.score;
       newEnemy.score = prevState.enemy.score;
 
+      // Handle win/loss
       if (winner === "player") {
         newPlayer = newPlayer.winRound();
       } else if (winner === "enemy") {
         newEnemy = newEnemy.winRound();
       }
 
-      // Add if we want to keep the cards if draw
-      // if (winner !== null) {
+      // Remove cards
       const playerCardID = prevState.player.selectedCardId;
       const enemyCardID = prevState.enemy.selectedCardId;
 
@@ -146,8 +162,8 @@ export default function Collision({ gameState, setGameState }: Props) {
       if (enemyCardID !== null) {
         newEnemy = newEnemy.removeCard(enemyCardID);
       }
-      // }
 
+      // Check for game end
       if (newPlayer.cards.length === 0 && newEnemy.cards.length === 0) {
         let endStatus: EndStatus;
         if (newPlayer.score > newEnemy.score) endStatus = "win";
@@ -198,13 +214,15 @@ export default function Collision({ gameState, setGameState }: Props) {
       return {
         title: "DRAW!",
         subtitle: "Both cards landed face-up",
-        subtext: "No winner this round",
+        subtext: "Battle again with same cards!",
+        buttonText: "Battle Again",
       };
     } else if (battleResult === "draw_both_down") {
       return {
         title: "DRAW!",
         subtitle: "Both cards landed face-down",
-        subtext: "No winner this round",
+        subtext: "Battle again with same cards!",
+        buttonText: "Battle Again",
       };
     } else if (winner) {
       const winnerType = winner === "player" ? "Player" : "Enemy";
@@ -216,6 +234,7 @@ export default function Collision({ gameState, setGameState }: Props) {
         title: "VICTORY!",
         subtitle: `${winnerType} wins!`,
         subtext: faceUpText,
+        buttonText: "Continue",
       };
     }
     return null;
@@ -392,14 +411,18 @@ export default function Collision({ gameState, setGameState }: Props) {
       <AnimatePresence>
         {announcement && (
           <motion.button
-            className="absolute bottom-8 left-1/2 -translate-x-1/2 text-center px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 font-bold transition cursor-pointer"
+            className={`absolute bottom-8 left-1/2 -translate-x-1/2 text-center px-4 py-2 text-white rounded-md font-bold transition cursor-pointer ${
+              battleResult?.startsWith("draw")
+                ? "bg-orange-600 hover:bg-orange-700"
+                : "bg-gray-600 hover:bg-gray-700"
+            }`}
             initial={{ opacity: 0, y: -50, scale: 0.8 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0 }}
             transition={{ delay: 0.5 }}
             onClick={handleContinueClick}
           >
-            Continue
+            {announcement.buttonText}
           </motion.button>
         )}
       </AnimatePresence>
