@@ -21,6 +21,8 @@ const scenes: Record<SceneState, React.ComponentType<SceneProps>> = {
 };
 
 const initialGameState: GameState = {
+  playerModifiedProbability: 0,
+  enemyModifiedProbability: 0,
   state: "loading",
   endStatus: "pending",
   player: new Player(cards), // Initialize with cards
