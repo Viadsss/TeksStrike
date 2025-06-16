@@ -15,74 +15,120 @@ interface Props {
   setGameState: React.Dispatch<React.SetStateAction<GameState>>;
 }
 
+const TIMER = 30; // seconds
+
 export default function Game({ gameState, setGameState }: Props) {
   const [gameInitialized, setGameInitialized] = useState(false);
   const [enemyHasSelectedCard, setEnemyHasSelectedCard] = useState(false);
   const [aiCardData, setAiCardData] = useState<CardModel | null>(null);
+  const [timeLeft, setTimeLeft] = useState(TIMER);
+  const [timerActive, setTimerActive] = useState(false);
+  const [timerExpired, setTimerExpired] = useState(false);
   const gameAreaRef = useRef<HTMLDivElement>(null);
   const { playClick, playCardSlide } = useContext(SoundContext);
   const { post } = usePost();
   const aiRequestInProgress = useRef(false);
+  const timerRef = useRef<number | null>(null);
 
   const { player, enemy } = gameState;
 
+  // Timer effect - runs continuously once started
   useEffect(() => {
-    async function initGame() {
-      console.log("INITIALIZE GAME");
-      const result = await post("http://localhost:3000/init");
-
-      if (result) {
-        console.log(result);
-        const playerCards = result.playerHand.map(deserializeCard);
-        const enemyCards = result.enemyHand.map(deserializeCard);
-
-        setGameState((prev) => ({
-          ...prev,
-          player: new Player(playerCards),
-          enemy: new Enemy(enemyCards),
-          isInitialized: true,
-        }));
-      }
+    if (timerActive && timeLeft > 0) {
+      timerRef.current = setTimeout(() => {
+        setTimeLeft((prev) => prev - 1);
+      }, 1000);
+    } else if (timeLeft === 0 && timerActive) {
+      setTimerExpired(true);
+      setTimerActive(false);
     }
 
+    return () => {
+      if (timerRef.current) {
+        clearTimeout(timerRef.current);
+      }
+    };
+  }, [timerActive, timeLeft]);
+
+  // Auto-select first card when timer expires
+  useEffect(() => {
+    if (
+      timerExpired &&
+      !player.getSelectedCardData() &&
+      player.cards.length > 0
+    ) {
+      const firstCard = player.cards[0];
+      setGameState((prevState) => ({
+        ...prevState,
+        player: prevState.player.selectCard(firstCard),
+      }));
+    }
+  }, [timerExpired, player, setGameState]);
+
+  // Start timer when game is initialized (only once per round)
+  useEffect(() => {
+    if (
+      gameInitialized &&
+      !timerActive &&
+      !timerExpired &&
+      timeLeft === TIMER
+    ) {
+      setTimerActive(true);
+    }
+  }, [gameInitialized, timerActive, timerExpired, timeLeft]);
+
+  const initGame = useCallback(async () => {
+    console.log("INITIALIZE GAME");
+    const result = await post("http://localhost:3000/init");
+
+    if (result) {
+      console.log(result);
+      const playerCards = result.playerHand.map(deserializeCard);
+      const enemyCards = result.enemyHand.map(deserializeCard);
+
+      setGameState((prev) => ({
+        ...prev,
+        player: new Player(playerCards),
+        enemy: new Enemy(enemyCards),
+        isInitialized: true,
+      }));
+    }
+  }, [post, setGameState]);
+
+  useEffect(() => {
     if (!gameState.isInitialized) {
       initGame();
     }
-  }, [gameState.isInitialized, post, setGameState]);
+  }, [gameState.isInitialized, initGame]);
 
-  // Fetch AI card selection for the current round
-  useEffect(() => {
-    async function getAICardSelection() {
-      if (
-        gameState.isInitialized &&
-        !aiCardData &&
-        !enemyHasSelectedCard &&
-        !aiRequestInProgress.current
-      ) {
-        aiRequestInProgress.current = true;
-        console.log("CALLING POST ROUND ON ROUND:", gameState.round);
+  const getAICardSelection = useCallback(async () => {
+    if (
+      gameState.isInitialized &&
+      !aiCardData &&
+      !enemyHasSelectedCard &&
+      !aiRequestInProgress.current
+    ) {
+      aiRequestInProgress.current = true;
+      console.log("CALLING POST ROUND ON ROUND:", gameState.round);
 
-        try {
-          const aiCard = await post(
-            `http://localhost:3000/round/${gameState.round}`
-          );
-          if (aiCard) {
-            console.log("AI selected card:", aiCard);
-            setAiCardData(aiCard);
-          }
-        } catch (error) {
-          if (error instanceof Error) {
-            console.error("Failed to get AI card selection:", error.message);
-          } else {
-            console.error("Unknown error:", error);
-          }
-        } finally {
-          aiRequestInProgress.current = false;
+      try {
+        const aiCard = await post(
+          `http://localhost:3000/round/${gameState.round}`
+        );
+        if (aiCard) {
+          console.log("AI selected card:", aiCard);
+          setAiCardData(aiCard);
         }
+      } catch (error) {
+        if (error instanceof Error) {
+          console.error("Failed to get AI card selection:", error.message);
+        } else {
+          console.error("Unknown error:", error);
+        }
+      } finally {
+        aiRequestInProgress.current = false;
       }
     }
-
-    getAICardSelection();
   }, [
     gameState.isInitialized,
     gameState.round,
@@ -91,9 +137,20 @@ export default function Game({ gameState, setGameState }: Props) {
     post,
   ]);
 
+  useEffect(() => {
+    getAICardSelection();
+  }, [getAICardSelection]);
+
   // Reset the flag when round changes
   useEffect(() => {
     aiRequestInProgress.current = false;
+    // Reset timer state for new round
+    setTimeLeft(TIMER);
+    setTimerActive(false);
+    setTimerExpired(false);
+    if (timerRef.current) {
+      clearTimeout(timerRef.current);
+    }
   }, [gameState.round]);
 
   // Reset initialization when coming back from other states
@@ -111,6 +168,9 @@ export default function Game({ gameState, setGameState }: Props) {
     id: number,
     element: HTMLElement
   ) => {
+    // Prevent deselection if timer has expired
+    if (timerExpired) return;
+
     // If clicking the same card that's already selected, deselect it
     console.log(id);
     if (player.isCardSelected(card.id)) {
@@ -156,6 +216,9 @@ export default function Game({ gameState, setGameState }: Props) {
   };
 
   const handleSelectedCardClick = () => {
+    // Prevent deselection if timer has expired
+    if (timerExpired) return;
+
     // Return the selected card to hand
     setGameState((prevState) => ({
       ...prevState,
@@ -201,14 +264,14 @@ export default function Game({ gameState, setGameState }: Props) {
   ]);
 
   const handleResetBattle = () => {
+    // Prevent reset if timer has expired
+    if (timerExpired) return;
+
     playClick();
-    // setEnemyHasSelectedCard(false);
-    // setAiCardData(null); // Reset AI card data for next round
 
     setGameState((prevState) => ({
       ...prevState,
       player: prevState.player.reset(),
-      // enemy: prevState.enemy.reset(),
     }));
   };
 
@@ -279,8 +342,21 @@ export default function Game({ gameState, setGameState }: Props) {
         />
 
         {/* Round indicator */}
-        <div className="absolute top-4 left-4 bg-blue-600 text-white px-3 py-1 rounded-md font-bold">
+        <div className="absolute top-4 left-4 text-2xl bg-blue-600 text-white px-3 py-1 rounded-md font-bold">
           Round {gameState.round}
+        </div>
+
+        {/* Timer display */}
+        <div
+          className={`absolute top-16 text-2xl left-4 px-3 py-1 rounded-md font-bold text-white ${
+            timeLeft <= 3
+              ? "bg-red-600"
+              : timeLeft <= 5
+              ? "bg-yellow-600"
+              : "bg-green-600"
+          }`}
+        >
+          Timer: {timeLeft}s
         </div>
 
         {/* Middle battle area */}
@@ -421,7 +497,7 @@ export default function Game({ gameState, setGameState }: Props) {
         <div className="flex gap-4 mb-4">
           <button
             onClick={handleResetBattle}
-            disabled={isAnimating}
+            disabled={isAnimating || timerExpired}
             className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 disabled:bg-gray-400 disabled:cursor-not-allowed font-bold"
           >
             Reset Battle
@@ -439,7 +515,7 @@ export default function Game({ gameState, setGameState }: Props) {
           hand={player.getHandCards()}
           flippedCards={false}
           reverse={false}
-          interactive={gameInitialized && !isAnimating && !selectedCard}
+          interactive={gameInitialized && !isAnimating && !timerExpired}
           onCardClick={handleCardClick}
         />
       </div>
