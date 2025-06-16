@@ -266,7 +266,7 @@ export default function Game({ gameState, setGameState }: Props) {
   }
 
   return (
-    <div className="w-7xl h-screen border-2 mx-auto font-gamja border-red-500">
+    <div className="w-7xl h-screen mx-auto font-gamja">
       <div
         ref={gameAreaRef}
         className="bg-transparent w-full h-full border-2 flex flex-col items-center justify-between gap-4 pb-8 overflow-hidden relative"

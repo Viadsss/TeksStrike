@@ -15,7 +15,7 @@ export default function Menu({ setGameState }: Props) {
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       transition={{ duration: 0.5 }}
-      className="w-7xl h-screen border mx-auto font-gamja border-red-500 flex flex-col items-center justify-center"
+      className="w-7xl h-screen mx-auto font-gamja flex flex-col items-center justify-center"
     >
       <h1 className="text-6xl">Menu</h1>
       <button
@@ -36,14 +36,14 @@ export default function Menu({ setGameState }: Props) {
       >
         Rules
       </button>
-      <button
+      {/* <button
         className="text-xl border rounded px-4 py-2 mt-8 hover:bg-gray-200 transition"
         onClick={() => {
           playClick();
         }}
       >
         Settings
-      </button>
+      </button> */}
     </motion.div>
   );
 }
