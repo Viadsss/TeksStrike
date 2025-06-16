@@ -1,5 +1,4 @@
 import { useContext } from "react";
-import { cards } from "../cards";
 import { Enemy } from "../Enemy";
 import { Player } from "../Player";
 import type { GameState } from "../types";
@@ -18,10 +17,13 @@ export default function End({ gameState, setGameState }: Props) {
     playClick();
 
     setGameState({
+      playerModifiedProbability: 0,
+      enemyModifiedProbability: 0,
+      isInitialized: false,
       state: "menu",
       endStatus: "pending",
-      player: new Player(cards),
-      enemy: new Enemy(cards),
+      player: new Player(),
+      enemy: new Enemy(),
     });
   };
 

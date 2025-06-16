@@ -2,10 +2,13 @@ import { useEffect, useState, useRef, useCallback, useContext } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import Hand from "../components/Hand";
 import Card from "../components/Card";
-import { cards } from "../cards";
 import type { GameState } from "../types";
 import { Card as CardModel } from "../Card";
 import { SoundContext } from "../context/SoundContext";
+import { usePost } from "../hooks/usePost";
+import { deserializeCard } from "../utils/deserializeCard";
+import { Player } from "../Player";
+import { Enemy } from "../Enemy";
 
 interface Props {
   gameState: GameState;
@@ -13,62 +16,36 @@ interface Props {
 }
 
 export default function Game({ gameState, setGameState }: Props) {
-  const [visibleCards, setVisibleCards] = useState(0);
   const [gameInitialized, setGameInitialized] = useState(false);
   const [enemyHasSelectedCard, setEnemyHasSelectedCard] = useState(false);
   const gameAreaRef = useRef<HTMLDivElement>(null);
   const { playClick, playCardSlide } = useContext(SoundContext);
+  const { post } = usePost();
 
   const { player, enemy } = gameState;
 
-  // Initial card distribution animation
   useEffect(() => {
-    // Only run if game is not initialized and players have no cards
-    if (
-      !gameInitialized &&
-      player.cards.length === 0 &&
-      enemy.cards.length === 0
-    ) {
-      const timer = setInterval(() => {
-        setVisibleCards((prev) => {
-          if (prev >= cards.length) {
-            clearInterval(timer);
-            setGameInitialized(true);
-            return prev;
-          }
-          return prev + 1;
-        });
-      }, 200);
+    async function initGame() {
+      const result = await post("http://localhost:3000/init");
 
-      return () => clearInterval(timer);
+      if (result) {
+        console.log(result);
+        const playerCards = result.playerHand.map(deserializeCard);
+        const enemyCards = result.enemyHand.map(deserializeCard);
+
+        setGameState((prev) => ({
+          ...prev,
+          player: new Player(playerCards),
+          enemy: new Enemy(enemyCards),
+          isInitialized: true,
+        }));
+      }
     }
-  }, [gameInitialized, player.cards.length, enemy.cards.length]);
 
-  // Update player and enemy cards based on visible cards (only during initial setup)
-  useEffect(() => {
-    if (!gameInitialized && visibleCards > 0) {
-      const currentPlayerCards = cards.slice(0, visibleCards);
-      const currentEnemyCards = cards.slice(0, visibleCards);
-
-      setGameState((prevState) => ({
-        ...prevState,
-        player: Object.assign(
-          Object.create(Object.getPrototypeOf(prevState.player)),
-          {
-            ...prevState.player,
-            cards: currentPlayerCards,
-          }
-        ),
-        enemy: Object.assign(
-          Object.create(Object.getPrototypeOf(prevState.enemy)),
-          {
-            ...prevState.enemy,
-            cards: currentEnemyCards,
-          }
-        ),
-      }));
+    if (!gameState.isInitialized) {
+      initGame();
     }
-  }, [visibleCards, setGameState, gameInitialized]);
+  }, [gameState.isInitialized, post, setGameState]);
 
   // Reset initialization when coming back from other states
   useEffect(() => {
@@ -77,7 +54,6 @@ export default function Game({ gameState, setGameState }: Props) {
       (player.cards.length > 0 || enemy.cards.length > 0)
     ) {
       setGameInitialized(true);
-      setVisibleCards(cards.length);
     }
   }, [gameState.state, player.cards.length, enemy.cards.length]);
 
