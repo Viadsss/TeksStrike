@@ -13,6 +13,7 @@ export type EndStatus = "win" | "lose" | "draw" | "pending";
 
 export interface GameState {
   isInitialized: boolean;
+  round: number;
   playerModifiedProbability: number;
   enemyModifiedProbability: number;
   state: SceneState;

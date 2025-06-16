@@ -91,6 +91,19 @@ export class Enemy {
     return this.selectCard(randomCard, initialPosition);
   }
 
+  selectSpecificCard(
+    selecterCardId: number,
+    gameRect?: DOMRect,
+    enemyAreaRect?: DOMRect
+  ): Enemy {
+    const selectedCard = this.getSpecificCard(selecterCardId);
+    if (!selectedCard) return this;
+
+    const initialPosition = this.getInitialPosition(gameRect, enemyAreaRect);
+
+    return this.selectCard(selectedCard, initialPosition);
+  }
+
   getInitialPosition(gameRect?: DOMRect, enemyAreaRect?: DOMRect) {
     let initialPosition: Position | undefined;
     if (gameRect && enemyAreaRect) {
@@ -140,6 +153,11 @@ export class Enemy {
 
     const randomIndex = Math.floor(Math.random() * availableCards.length);
     return availableCards[randomIndex];
+  }
+
+  getSpecificCard(cardId: number): Card | null {
+    const card = this.cards.find((card) => card.id === cardId);
+    return card || null;
   }
 
   getCardByMiniMax() {}

@@ -18,14 +18,17 @@ interface Props {
 export default function Game({ gameState, setGameState }: Props) {
   const [gameInitialized, setGameInitialized] = useState(false);
   const [enemyHasSelectedCard, setEnemyHasSelectedCard] = useState(false);
+  const [aiCardData, setAiCardData] = useState<CardModel | null>(null);
   const gameAreaRef = useRef<HTMLDivElement>(null);
   const { playClick, playCardSlide } = useContext(SoundContext);
   const { post } = usePost();
+  const aiRequestInProgress = useRef(false);
 
   const { player, enemy } = gameState;
 
   useEffect(() => {
     async function initGame() {
+      console.log("INITIALIZE GAME");
       const result = await post("http://localhost:3000/init");
 
       if (result) {
@@ -46,6 +49,52 @@ export default function Game({ gameState, setGameState }: Props) {
       initGame();
     }
   }, [gameState.isInitialized, post, setGameState]);
+
+  // Fetch AI card selection for the current round
+  useEffect(() => {
+    async function getAICardSelection() {
+      if (
+        gameState.isInitialized &&
+        !aiCardData &&
+        !enemyHasSelectedCard &&
+        !aiRequestInProgress.current
+      ) {
+        aiRequestInProgress.current = true;
+        console.log("CALLING POST ROUND ON ROUND:", gameState.round);
+
+        try {
+          const aiCard = await post(
+            `http://localhost:3000/round/${gameState.round}`
+          );
+          if (aiCard) {
+            console.log("AI selected card:", aiCard);
+            setAiCardData(aiCard);
+          }
+        } catch (error) {
+          if (error instanceof Error) {
+            console.error("Failed to get AI card selection:", error.message);
+          } else {
+            console.error("Unknown error:", error);
+          }
+        } finally {
+          aiRequestInProgress.current = false;
+        }
+      }
+    }
+
+    getAICardSelection();
+  }, [
+    gameState.isInitialized,
+    gameState.round,
+    aiCardData,
+    enemyHasSelectedCard,
+    post,
+  ]);
+
+  // Reset the flag when round changes
+  useEffect(() => {
+    aiRequestInProgress.current = false;
+  }, [gameState.round]);
 
   // Reset initialization when coming back from other states
   useEffect(() => {
@@ -115,10 +164,20 @@ export default function Game({ gameState, setGameState }: Props) {
   };
 
   const handleEnemyCardSelection = useCallback(() => {
-    if (enemy.cards.length === 0) return;
+    if (enemy.cards.length === 0 || !aiCardData) return;
 
     // Don't allow selection if already animating
     if (player.isAnimating || enemy.isAnimating) return;
+
+    // Find the AI-selected card in the enemy's hand
+    const aiSelectedCard = enemy.cards.find(
+      (card) => card.id === aiCardData.id || card.name === aiCardData.name
+    );
+
+    if (!aiSelectedCard) {
+      console.error("AI selected card not found in enemy hand");
+      return;
+    }
 
     // Calculate the initial position (from enemy hand to enemy card area)
     const enemyAreaElement = document.getElementById("enemy-card-area");
@@ -127,21 +186,29 @@ export default function Game({ gameState, setGameState }: Props) {
 
     setGameState((prevState) => ({
       ...prevState,
-      enemy: prevState.enemy.selectRandomCard(
+      enemy: prevState.enemy.selectSpecificCard(
+        aiSelectedCard.id,
         gameRect || undefined,
         enemyAreaRect || undefined
       ),
     }));
-  }, [enemy.cards.length, enemy.isAnimating, player.isAnimating, setGameState]);
+  }, [
+    enemy.cards,
+    aiCardData,
+    enemy.isAnimating,
+    player.isAnimating,
+    setGameState,
+  ]);
 
   const handleResetBattle = () => {
     playClick();
-    setEnemyHasSelectedCard(false);
+    // setEnemyHasSelectedCard(false);
+    // setAiCardData(null); // Reset AI card data for next round
 
     setGameState((prevState) => ({
       ...prevState,
       player: prevState.player.reset(),
-      enemy: prevState.enemy.reset(),
+      // enemy: prevState.enemy.reset(),
     }));
   };
 
@@ -157,36 +224,40 @@ export default function Game({ gameState, setGameState }: Props) {
   const enemySelectedCard = enemy.getSelectedCardData();
   const isAnimating = player.isAnimating || enemy.isAnimating;
 
+  // Modified enemy card selection effect to use AI data
   useEffect(() => {
-    let timer: ReturnType<typeof setTimeout>;
     if (
       gameInitialized &&
       !enemyHasSelectedCard &&
       enemy.cards.length > 0 &&
       !player.isAnimating &&
       !enemy.isAnimating &&
-      !enemy.getSelectedCardData()
+      !enemy.getSelectedCardData() &&
+      aiCardData
     ) {
-      const delay = Math.random() * 1000 + 2000;
-
-      timer = setTimeout(() => {
-        handleEnemyCardSelection();
-        playCardSlide();
-        setEnemyHasSelectedCard(true);
-      }, delay);
+      handleEnemyCardSelection();
+      playCardSlide();
+      setEnemyHasSelectedCard(true);
     }
-
-    return () => {
-      if (timer) clearTimeout(timer);
-    };
   }, [
     enemy,
     enemyHasSelectedCard,
     gameInitialized,
     player.isAnimating,
+    aiCardData,
     handleEnemyCardSelection,
     playCardSlide,
   ]);
+
+  const handleBattle = async () => {
+    playClick();
+
+    // Reset AI card data for next round
+    setAiCardData(null);
+    setEnemyHasSelectedCard(false);
+
+    setGameState((prev) => ({ ...prev, state: "collision" }));
+  };
 
   function winnerStatus(): "player" | "enemy" | "draw" {
     if (player.score > enemy.score) return "player";
@@ -206,6 +277,11 @@ export default function Game({ gameState, setGameState }: Props) {
           reverse={true}
           interactive={false}
         />
+
+        {/* Round indicator */}
+        <div className="absolute top-4 left-4 bg-blue-600 text-white px-3 py-1 rounded-md font-bold">
+          Round {gameState.round}
+        </div>
 
         {/* Middle battle area */}
         <div className="flex-1 flex items-center justify-center relative">
@@ -353,10 +429,7 @@ export default function Game({ gameState, setGameState }: Props) {
           <button
             disabled={!selectedCard || !enemySelectedCard}
             className="px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 disabled:bg-gray-400 disabled:cursor-not-allowed font-bold"
-            onClick={() => {
-              playClick();
-              setGameState((prev) => ({ ...prev, state: "collision" }));
-            }}
+            onClick={handleBattle}
           >
             Battle
           </button>

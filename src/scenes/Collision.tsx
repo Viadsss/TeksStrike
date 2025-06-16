@@ -1,10 +1,11 @@
 import { useState, useEffect, useContext } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import Card from "../components/Card";
-import type { EndStatus, GameState } from "../types";
+import type { EndStatus, GameState, SceneState } from "../types";
 import { Player } from "../Player";
 import { Enemy } from "../Enemy";
 import { SoundContext } from "../context/SoundContext";
+import { usePost } from "../hooks/usePost";
 
 interface Props {
   gameState: GameState;
@@ -19,7 +20,7 @@ type BattleResult =
   | "draw_both_down"
   | "draw_by_repetition";
 
-const MAX_CONSECUTIVE_DRAWS = 5;
+const MAX_CONSECUTIVE_DRAWS = 2;
 
 export default function Collision({ gameState, setGameState }: Props) {
   const { player, enemy } = gameState;
@@ -32,6 +33,8 @@ export default function Collision({ gameState, setGameState }: Props) {
   const [consecutiveDraws, setConsecutiveDraws] = useState(0);
   const { playClick, playCardCharge, playCardCollide } =
     useContext(SoundContext);
+  const [, setIsSync] = useState(false);
+  const { post } = usePost();
 
   function getModifiedProbability(baseProb: number, modifier: number): number {
     return Math.max(0, Math.min(1, baseProb + modifier));
@@ -142,6 +145,8 @@ export default function Collision({ gameState, setGameState }: Props) {
         ...prevState,
         playerModifiedProbability: playerFinalProb,
         enemyModifiedProbability: enemyFinalProb,
+        // Ensure state remains the correct SceneState type
+        state: prevState.state,
       }));
     }
   }, [
@@ -183,7 +188,7 @@ export default function Collision({ gameState, setGameState }: Props) {
     );
   }
 
-  const handleContinueClick = () => {
+  const handleContinueClick = async () => {
     playClick();
 
     // Check if it's a regular draw (not by repetition) - if so, restart the battle with same cards
@@ -201,15 +206,16 @@ export default function Collision({ gameState, setGameState }: Props) {
       return; // Don't update game state, just restart the battle
     }
 
-    // Handle non-draw results or draw by repetition - proceed normally
-    setGameState((prevState) => {
-      // Create new instances
-      let newPlayer = new Player(prevState.player.cards);
-      let newEnemy = new Enemy(prevState.enemy.cards);
+    setIsSync(true);
+
+    try {
+      // STEP 1: Calculate what the new state will be (but don't set it yet)
+      let newPlayer = new Player(gameState.player.cards);
+      let newEnemy = new Enemy(gameState.enemy.cards);
 
       // Copy over the score
-      newPlayer.score = prevState.player.score;
-      newEnemy.score = prevState.enemy.score;
+      newPlayer.score = gameState.player.score;
+      newEnemy.score = gameState.enemy.score;
 
       // Handle win/loss (draw by repetition doesn't add to score)
       if (winner === "player") {
@@ -218,10 +224,13 @@ export default function Collision({ gameState, setGameState }: Props) {
         newEnemy = newEnemy.winRound();
       }
 
-      // Remove cards
-      const playerCardID = prevState.player.selectedCardId;
-      const enemyCardID = prevState.enemy.selectedCardId;
+      // Store original selected cards for backend sync
+      const playerCardUsed = gameState.player.selectedCard;
+      const enemyCardUsed = gameState.enemy.selectedCard;
 
+      // Remove cards
+      const playerCardID = gameState.player.selectedCardId;
+      const enemyCardID = gameState.enemy.selectedCardId;
       if (playerCardID !== null) {
         newPlayer = newPlayer.removeCard(playerCardID);
       }
@@ -236,22 +245,61 @@ export default function Collision({ gameState, setGameState }: Props) {
         else if (newEnemy.score > newPlayer.score) endStatus = "lose";
         else endStatus = "draw";
 
-        return {
+        // STEP 2: Sync backend FIRST with end game
+        try {
+          await post("http://localhost:3000/end");
+          console.log("End game API call successful");
+        } catch (error) {
+          console.error("End game API call failed:", error);
+        }
+
+        // STEP 3: Then update frontend state
+        setGameState((prevState) => ({
           ...prevState,
           player: newPlayer,
           enemy: newEnemy,
           endStatus: endStatus,
-          state: "end",
-        };
+          state: "end" as SceneState,
+        }));
       } else {
-        return {
+        const nextRound = gameState.round + 1;
+
+        // STEP 2: Sync backend FIRST with new game state
+        const syncData = {
+          round: nextRound,
+          playerCards: newPlayer.cards,
+          enemyCards: newEnemy.cards,
+          playerScore: newPlayer.score,
+          enemyScore: newEnemy.score,
+          playerCardUsed: playerCardUsed,
+          enemyCardUsed: enemyCardUsed,
+          winner: winner,
+        };
+
+        try {
+          const response = await post(
+            "http://localhost:3000/sync-state",
+            syncData
+          );
+          console.log("Backend sync successful:", response);
+        } catch (error) {
+          console.error("Backend sync failed:", error);
+        }
+
+        // STEP 3: Then update frontend state (backend is now in sync)
+        setGameState((prevState) => ({
           ...prevState,
+          round: nextRound,
           player: newPlayer,
           enemy: newEnemy,
-          state: "game",
-        };
+          state: "game" as SceneState,
+        }));
       }
-    });
+    } catch (error) {
+      console.error("Error during state update:", error);
+    } finally {
+      setIsSync(false);
+    }
   };
 
   const getCardBattleState = (isPlayer: boolean) => {
@@ -495,7 +543,8 @@ export default function Collision({ gameState, setGameState }: Props) {
         {announcement && (
           <motion.button
             className={`absolute bottom-8 left-1/2 -translate-x-1/2 text-center px-4 py-2 text-white rounded-md font-bold transition cursor-pointer ${
-              battleResult === "draw_both_up" || battleResult === "draw_both_down"
+              battleResult === "draw_both_up" ||
+              battleResult === "draw_both_down"
                 ? "bg-orange-600 hover:bg-orange-700"
                 : battleResult === "draw_by_repetition"
                 ? "bg-purple-600 hover:bg-purple-700"

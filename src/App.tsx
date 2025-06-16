@@ -23,6 +23,7 @@ const scenes: Record<SceneState, React.ComponentType<SceneProps>> = {
 export default function App() {
   const [gameState, setGameState] = useState<GameState>({
     isInitialized: false,
+    round: 1,
     playerModifiedProbability: 0,
     enemyModifiedProbability: 0,
     state: "loading",

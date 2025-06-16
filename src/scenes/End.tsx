@@ -1,9 +1,10 @@
-import { useContext } from "react";
+import { useContext, useEffect, useState } from "react";
 import { Enemy } from "../Enemy";
 import { Player } from "../Player";
 import type { GameState } from "../types";
 import { motion } from "framer-motion";
 import { SoundContext } from "../context/SoundContext";
+import { usePost } from "../hooks/usePost";
 
 interface Props {
   gameState: GameState;
@@ -12,14 +13,30 @@ interface Props {
 
 export default function End({ gameState, setGameState }: Props) {
   const { playClick } = useContext(SoundContext);
+  const { post } = usePost();
+  const [isEndPosted, setIsEndPosted] = useState(false);
 
+  useEffect(() => {
+    if (!isEndPosted) {
+      const sendEnd = async () => {
+        try {
+          await post("http://localhost:3000/end");
+          setIsEndPosted(true);
+        } catch (err) {
+          console.error("Failed to post /end:", err);
+        }
+      };
+      sendEnd();
+    }
+  }, [isEndPosted, post]);
   const handlePlayAgain = () => {
     playClick();
 
     setGameState({
+      isInitialized: false,
+      round: 1,
       playerModifiedProbability: 0,
       enemyModifiedProbability: 0,
-      isInitialized: false,
       state: "menu",
       endStatus: "pending",
       player: new Player(),
