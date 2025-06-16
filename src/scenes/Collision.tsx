@@ -20,7 +20,7 @@ type BattleResult =
   | "draw_both_down"
   | "draw_by_repetition";
 
-const MAX_CONSECUTIVE_DRAWS = 2;
+const MAX_CONSECUTIVE_DRAWS = 5;
 
 export default function Collision({ gameState, setGameState }: Props) {
   const { player, enemy } = gameState;
