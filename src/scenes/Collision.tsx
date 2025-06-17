@@ -35,6 +35,16 @@ export default function Collision({ gameState, setGameState }: Props) {
     useContext(SoundContext);
   const [, setIsSync] = useState(false);
   const { post } = usePost();
+  const [playerModifiedChance, setPlayerModifiedChance] = useState(0);
+  const [enemyModifiedChance, setEnemyModifiedChance] = useState(0);
+
+  // Add states to store the random chances used in battle
+  const [playerRandomChance, setPlayerRandomChance] = useState<number | null>(
+    null
+  );
+  const [enemyRandomChance, setEnemyRandomChance] = useState<number | null>(
+    null
+  );
 
   function getModifiedProbability(baseProb: number, modifier: number): number {
     return Math.max(0, Math.min(1, baseProb + modifier));
@@ -46,6 +56,10 @@ export default function Collision({ gameState, setGameState }: Props) {
       playerModifiedProbability: number,
       enemyModifiedProbability: number
     ) => {
+      // Store the modified probabilities for display
+      setPlayerModifiedChance(playerModifiedProbability);
+      setEnemyModifiedChance(enemyModifiedProbability);
+
       playCardCharge();
       setBattlePhase("charging");
 
@@ -60,6 +74,10 @@ export default function Collision({ gameState, setGameState }: Props) {
 
       const randomChancePlayer = Math.random();
       const randomChanceEnemy = Math.random();
+
+      // Store the random chances for display
+      setPlayerRandomChance(randomChancePlayer);
+      setEnemyRandomChance(randomChanceEnemy);
 
       // Determine face-up status with random chance
       const playerFaceUpResult = playerModifiedProbability > randomChancePlayer;
@@ -203,6 +221,9 @@ export default function Collision({ gameState, setGameState }: Props) {
       setShowEffects(false);
       setPlayerFaceUp(null);
       setEnemyFaceUp(null);
+      // Reset random chances for new battle
+      setPlayerRandomChance(null);
+      setEnemyRandomChance(null);
       return; // Don't update game state, just restart the battle
     }
 
@@ -561,26 +582,76 @@ export default function Collision({ gameState, setGameState }: Props) {
         )}
       </AnimatePresence>
 
-      {/* Battle Phase Indicator */}
-      <div className="absolute top-4 right-4 text-white/70 text-sm font-geist-mono">
-        Phase: {battlePhase.toUpperCase()}
-        {battleResult && (
-          <div className="text-xs mt-1">
-            Result: {battleResult.toUpperCase().replace("_", " ")}
+      {/* Battle Phase Indicator with Probabilities */}
+      <div className="absolute top-4 right-4 text-white/70 text-sm font-geist-mono bg-black/30 rounded-lg p-3">
+        <div className="font-bold text-white mb-2">Battle Info</div>
+        <div>Phase: {battlePhase.toUpperCase()}</div>
+
+        {/* Show modified probabilities once they're calculated */}
+        {playerModifiedChance > 0 && (
+          <div className="mt-2 border-t border-white/20 pt-2">
+            <div className="text-xs text-blue-300">Modified Probabilities:</div>
+            <div className="text-xs">
+              Player: {(playerModifiedChance * 100).toFixed(1)}%
+            </div>
+            <div className="text-xs">
+              Enemy: {(enemyModifiedChance * 100).toFixed(1)}%
+            </div>
           </div>
         )}
+
+        {/* Show random chances once they're generated */}
+        {playerRandomChance !== null && enemyRandomChance !== null && (
+          <div className="mt-2 border-t border-white/20 pt-2">
+            <div className="text-xs text-yellow-300">Random Rolls:</div>
+            <div className="text-xs">
+              Player: {(playerRandomChance * 100).toFixed(1)}%
+            </div>
+            <div className="text-xs">
+              Enemy: {(enemyRandomChance * 100).toFixed(1)}%
+            </div>
+          </div>
+        )}
+
+        {battleResult && (
+          <div className="mt-2 border-t border-white/20 pt-2">
+            <div className="text-xs">
+              Result: {battleResult.toUpperCase().replace("_", " ")}
+            </div>
+          </div>
+        )}
+
         {consecutiveDraws > 0 && (
           <div className="text-xs mt-1 text-orange-300">
             Consecutive Draws: {consecutiveDraws}/{MAX_CONSECUTIVE_DRAWS}
           </div>
         )}
+
         {battlePhase === "resolved" &&
           playerFaceUp !== null &&
           enemyFaceUp !== null && (
-            <div className="text-xs mt-1">
-              Player: {playerFaceUp ? "Face-Up" : "Face-Down"}
-              <br />
-              Enemy: {enemyFaceUp ? "Face-Up" : "Face-Down"}
+            <div className="mt-2 border-t border-white/20 pt-2">
+              <div className="text-xs text-green-300">Final Results:</div>
+              <div className="text-xs">
+                Player: {playerFaceUp ? "Face-Up" : "Face-Down"}
+              </div>
+              <div className="text-xs">
+                Enemy: {enemyFaceUp ? "Face-Up" : "Face-Down"}
+              </div>
+              {playerRandomChance !== null && enemyRandomChance !== null && (
+                <div className="mt-1 text-xs text-gray-300">
+                  <div>
+                    Player: {(playerModifiedChance * 100).toFixed(1)}% {">"}{" "}
+                    {(playerRandomChance * 100).toFixed(1)}% ={" "}
+                    {playerFaceUp ? "✓" : "✗"}
+                  </div>
+                  <div>
+                    Enemy: {(enemyModifiedChance * 100).toFixed(1)}% {">"}{" "}
+                    {(enemyRandomChance * 100).toFixed(1)}% ={" "}
+                    {enemyFaceUp ? "✓" : "✗"}
+                  </div>
+                </div>
+              )}
             </div>
           )}
       </div>
